@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>DeskVibes</AssemblyName>
+    <RootNamespace>DeskVibes</RootNamespace>
+    <Version>0.1.0</Version>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <Product>DeskVibes</Product>
+    <Authors>Alfred Ducharme</Authors>
+    <NoWarn>CA1416;WFO1000</NoWarn>
+  </PropertyGroup>
+</Project>
