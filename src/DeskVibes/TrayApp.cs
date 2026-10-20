@@ -31,7 +31,8 @@ public sealed class TrayApp : ApplicationContext
         watchers = new Watchers((type, ctx) => Engine.Push(type, ctx));
         Mail.NewMail += m => ui.Post(_ => Engine.Push("mail.new", Ctx.Of(("from", m.From), ("subject", m.Subject), ("info", Mime.ShortName(m.From)))), null);
 
-        if (Store.FirstRun) { foreach (var v in Gallery.Starter()) Store.Vibes.Add(v); Store.Save(); }
+        if (Store.FirstRun) { foreach (var v in Gallery.Starter()) Store.Vibes.Add(v); Store.Settings.GotDeck = true; Store.Save(); }
+        else if (Gallery.AddDeckOnce(Store.Vibes, Store.Settings)) Store.Save();
 
         tray = new NotifyIcon { Icon = icon, Text = "DeskVibes", Visible = true, ContextMenuStrip = new ContextMenuStrip { Renderer = new DarkMenu(), ShowImageMargin = false } };
         tray.ContextMenuStrip.Opening += (_, _) => BuildMenu();

@@ -124,6 +124,20 @@ public static class Gallery
         var health = Ideas.First(i => i.Blurb.StartsWith("CPU, memory")).Make(); list.Add(health);
         var back = Ideas.First(i => i.Blurb.StartsWith("Welcome back")).Make(); list.Add(back);
         var anyMail = Ideas.First(i => i.Blurb.StartsWith("Soft yellow")).Make(); list.Add(anyMail);
+        list.Add(DeckWidget());
         return list;
+    }
+
+    /// <summary>The button deck everyone starts with (8 x 2, opens when you point at it).</summary>
+    public static Vibe DeckWidget() => Ideas.First(i => i.Blurb.StartsWith("A Stream Deck")).Make();
+
+    /// <summary>Adds the button deck once to setups made before it existed. Deleting it later keeps it gone.</summary>
+    public static bool AddDeckOnce(List<Vibe> vibes, Settings settings)
+    {
+        if (settings.GotDeck) return false;
+        settings.GotDeck = true;
+        if (vibes.Any(v => v.Widget?.Type == "w.deck")) return true;
+        vibes.Add(DeckWidget());
+        return true;
     }
 }

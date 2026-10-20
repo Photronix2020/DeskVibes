@@ -101,6 +101,8 @@ public sealed class Settings
     public bool Paused { get; set; }
     public bool StartWithWindows { get; set; }
     public bool SeenWelcome { get; set; }
+    /// <summary>The button deck was added (new installs get it in the starter set, older ones once on update).</summary>
+    public bool GotDeck { get; set; }
 }
 
 /// <summary>Values an event hands to its actions, used to fill {placeholders} in texts.</summary>

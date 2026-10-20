@@ -118,6 +118,10 @@ Test("catalog", () =>
         Check(Catalog.Summary(v).Length > 0, "summary " + v.Name);
     }
     Check(Gallery.Starter().Count >= 3, "starter vibes");
+    var deck = Gallery.Starter().Where(v => v.Widget?.Type == "w.deck").ToList();
+    Eq(deck.Count, 1, "new installs get the button deck");
+    Check(deck[0].On, "and it's switched on");
+    Eq(Deck.Cols(deck[0].Widget!) * 10 + Deck.Rows(deck[0].Widget!), 82, "8 x 2");
 });
 
 // ---------- describe it ----------
@@ -308,6 +312,21 @@ Test("deck: icons", () =>
     Check(icon != null && icon.Width >= 32, "real icon from the shell");
     Check(ReferenceEquals(icon, Deck.Icon(notepad, 48)), "cached");
     Check(Deck.Icon(@"C:\nope\missing.exe", 48) == null, "missing file → no icon");
+});
+
+Test("deck: added once to older setups", () =>
+{
+    var old = new List<Vibe> { new() { Name = "Mine" } };
+    var st = new Settings();
+    Check(Gallery.AddDeckOnce(old, st), "added on update");
+    Eq(old.Count(v => v.Widget?.Type == "w.deck"), 1, "one deck");
+    Check(st.GotDeck, "remembered");
+    old.RemoveAll(v => v.Widget?.Type == "w.deck");
+    Check(!Gallery.AddDeckOnce(old, st), "not again");
+    Eq(old.Count(v => v.Widget?.Type == "w.deck"), 0, "deleting it keeps it gone");
+    var has = new List<Vibe> { Gallery.DeckWidget() };
+    Gallery.AddDeckOnce(has, new Settings());
+    Eq(has.Count, 1, "no second deck if one is there");
 });
 
 // ---------- AI describe (canned answers, no network) ----------
