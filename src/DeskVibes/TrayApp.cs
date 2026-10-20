@@ -14,7 +14,7 @@ public sealed class TrayApp : ApplicationContext
     readonly NotifyIcon tray;
     readonly Watchers watchers;
     readonly System.Windows.Forms.Timer tick = new() { Interval = 1000 };
-    readonly Dictionary<string, (WidgetForm form, WidgetContent content, string sig)> widgets = new();
+    readonly Dictionary<string, (Form form, string sig)> widgets = new();
     readonly SynchronizationContext ui;
     readonly Icon icon = Theme.MakeIcon(), pausedIcon = Theme.MakeIcon(32, true);
     MainForm? main;
@@ -53,7 +53,7 @@ public sealed class TrayApp : ApplicationContext
     {
         try { world.Refresh(); } catch (Exception ex) { Engine.Note("Couldn't read the PC state: " + ex.Message); }
         Engine.Tick();
-        foreach (var (form, _, _) in widgets.Values) if (form.Visible) form.Invalidate();
+        foreach (var (form, _) in widgets.Values) if (form.Visible && form is WidgetForm) form.Invalidate();
     }
 
     /// <summary>Brings widgets and hotkeys in line with the saved vibes.</summary>
@@ -70,16 +70,22 @@ public sealed class TrayApp : ApplicationContext
         }
         foreach (var v in want.Values)
         {
-            var sig = Json.Write(v.Widget) + v.Place.ClickThrough;
+            bool deck = v.Widget!.Type == "w.deck";
+            // a deck's buttons change often; only its shape needs a new window
+            var sig = deck ? "deck|" + Deck.Shape(v.Widget) : Json.Write(v.Widget) + v.Place.ClickThrough;
             if (widgets.TryGetValue(v.Id, out var w))
             {
-                if (w.sig == sig) { w.form.Update(v); continue; }
+                if (w.sig == sig)
+                {
+                    if (w.form is WidgetForm wf) wf.Update(v); else if (w.form is DeckForm df) df.Update(v);
+                    continue;
+                }
                 w.form.Close(); widgets.Remove(v.Id);
             }
             if (v.Place.X < 0 || v.Place.Y < 0) FindSpot(v);
-            var content = new WidgetContent(v, Engine, () => Store.Settings);
-            var form = new WidgetForm(v, content, SaveQuietly, x => Edit(x, false, null));
-            widgets[v.Id] = (form, content, sig);
+            Form form = deck ? new DeckForm(v, SaveQuietly, x => Edit(x, false, null))
+                             : new WidgetForm(v, new WidgetContent(v, Engine, () => Store.Settings), SaveQuietly, x => Edit(x, false, null));
+            widgets[v.Id] = (form, sig);
             form.Show();
         }
         VibesChanged?.Invoke();
@@ -91,7 +97,7 @@ public sealed class TrayApp : ApplicationContext
         var area = Screen.PrimaryScreen!.WorkingArea;
         int w = v.Place.W > 0 ? v.Place.W : 260;
         int x = area.Right - w - 24, y = area.Top + 24;
-        foreach (var (form, _, _) in widgets.Values)
+        foreach (var (form, _) in widgets.Values)
             if (form.Right > area.Right - 420 && form.Top < area.Bottom - 200 && area.Contains(form.Location)) y = Math.Max(y, form.Bottom + 12);
         if (y > area.Bottom - 150) y = area.Top + 24;
         v.Place.X = x; v.Place.Y = y;
@@ -192,7 +198,7 @@ public sealed class TrayApp : ApplicationContext
         tick.Stop();
         Store.Save();
         Overlays.CloseAll();
-        foreach (var (form, _, _) in widgets.Values) form.Close();
+        foreach (var (form, _) in widgets.Values) form.Close();
         widgets.Clear();
         tray.Visible = false;
         tray.Dispose();

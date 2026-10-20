@@ -76,12 +76,29 @@ static class Program
                 """)!;
             Snap(new BuilderForm(ai.Vibe, quiet.Engine, true, string.Join("\n", ai.Understood)), "ui-builder-ai.png");
             Snap(new BuilderForm(Gallery.Ideas.First(i => i.Make().IsWidget).Make(), quiet.Engine, true), "ui-builder-widget.png");
-            var shown = new List<(WidgetForm f, string n)>();
+            var shown = new List<(Form f, string n)>();
             foreach (var idea in Gallery.Ideas.Where(i => i.Category == "Widgets"))
             {
                 var v = idea.Make();
                 v.Place.X = -30000; v.Place.Y = -30000;
                 if (v.Widget!.Type == "w.note") v.Place.Note = "Call mom\r\nBuy milk";
+                if (v.Widget.Type == "w.deck")
+                {
+                    // a few real programs so the icons show; folded and open
+                    var sys = Environment.GetFolderPath(Environment.SpecialFolder.System);
+                    var win = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+                    var demo = new[] { Path.Combine(sys, "notepad.exe"), Path.Combine(win, "explorer.exe"), Path.Combine(sys, "cmd.exe"), Path.Combine(sys, "mspaint.exe"), Path.Combine(sys, "taskmgr.exe") };
+                    int n = 0;
+                    foreach (var d in demo.Where(File.Exists)) Deck.Assign(v.Widget, n++, d);
+                    var folded = new DeckForm(v, _ => { }, _ => { });
+                    folded.Show(); folded.Location = new Point(-30000, -30000);
+                    shown.Add((folded, "w.deck-folded"));
+                    var v2 = v.Clone(); v2.Widget!.P["show"] = "Always";
+                    var opened = new DeckForm(v2, _ => { }, _ => { });
+                    opened.Show();
+                    shown.Add((opened, "w.deck"));
+                    continue;
+                }
                 var wf = new WidgetForm(v, new WidgetContent(v, quiet.Engine, () => store.Settings), _ => { }, _ => { });
                 wf.Show(); wf.Location = new Point(-30000, -30000);
                 shown.Add((wf, v.Widget.Type));

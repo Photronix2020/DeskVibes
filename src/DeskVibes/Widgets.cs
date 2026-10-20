@@ -219,6 +219,7 @@ public sealed class WidgetContent
                 L.Add(new WLine(new Ctx().Fill(S.Get("text"), now), Theme.Text, (float)Math.Clamp(S.Num("size", 16) / 10.0, 0.7, 6)));
                 break;
             case "w.note":
+            case "w.deck": // drawn by DeckForm
                 break;
             default:
                 L.Add(new WLine("Unknown widget " + S.Type, Theme.Bad));

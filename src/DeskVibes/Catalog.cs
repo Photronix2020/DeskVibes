@@ -152,6 +152,9 @@ public static class Catalog
             new[] { T("url", "Feed address", "https://feeds.bbci.co.uk/news/rss.xml"), N("count", "How many", "5") }),
         new("w.text", "Widgets", "Text", "Any text, like a quote. {time} and {date} work.",
             new[] { L("text", "Text", "You've got this."), N("size", "Text size", "16") }),
+        new("w.deck", "Widgets", "Button deck", "Like a Stream Deck on your screen. Point at it to show the buttons. Click an empty button (or right-click any button) to pick a program, or drag a program onto it.",
+            new[] { N("cols", "Columns", "8"), N("rows", "Rows", "2"), N("size", "Button size (pixels)", "64"),
+                    Ch("show", "Show the buttons", "When I point at it", "When I point at it", "Always"), B("labels", "Show names under the icons", true) }),
     };
 
     public static readonly Def[] Conditions =

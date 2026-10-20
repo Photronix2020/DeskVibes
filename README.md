@@ -44,6 +44,10 @@ board (websites and WoW realms), clipboard history, screen time, inbox, today's 
 Right-click a widget: keep on top, stay on the desktop behind your windows, lock in place, let clicks go through it,
 or make it see-through.
 
+Button deck: a Stream Deck on your screen. It sits as a small tab; point at it and a grid of buttons opens
+(8 across and 2 down to start, change it with "Change size and layout"). Click an empty button, right-click any
+button, or drag a program onto it to choose what it opens. Each button shows that program's own icon.
+
 Share
 -----
 "⋯ → Copy share code" on any vibe gives you a code like DV1:... that a friend can paste in.

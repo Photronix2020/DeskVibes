@@ -233,6 +233,83 @@ Test("describe: gibberish", () =>
     Check(r.Vibe.Do.Count > 0, "still has an action");
 });
 
+// ---------- button deck ----------
+
+Test("deck: defaults and limits", () =>
+{
+    var s = new Step("w.deck");
+    Eq(Deck.Cols(s), 8, "8 columns");
+    Eq(Deck.Rows(s), 2, "2 rows");
+    Eq(Deck.Count(s), 16, "16 buttons");
+    Check(!Deck.AlwaysOpen(s), "opens on hover by default");
+    Check(Deck.Labels(s), "names on by default");
+    s.P["cols"] = "100"; s.P["rows"] = "0"; s.P["size"] = "5";
+    Eq(Deck.Cols(s), Deck.MaxCols, "columns capped");
+    Eq(Deck.Rows(s), 1, "at least one row");
+    Eq(Deck.ButtonSize(s), 32, "smallest button");
+    s.P["show"] = "Always";
+    Check(Deck.AlwaysOpen(s), "always open");
+    var d = Catalog.Find("w.deck")!;
+    Eq(d.Fields.First(f => f.Key == "cols").Default, "8", "catalog default columns");
+    Eq(d.Fields.First(f => f.Key == "rows").Default, "2", "catalog default rows");
+    Check(Gallery.Ideas.Any(i => i.Make().Widget?.Type == "w.deck"), "in the Ideas tab");
+});
+
+Test("deck: layout", () =>
+{
+    var (whole, b) = Deck.Layout(8, 2, 64, 8, 26);
+    Eq(b.Length, 16, "16 rectangles");
+    Eq(b[0], new Rectangle(8, 26, 64, 64), "first button");
+    Eq(b[7], new Rectangle(8 + 7 * 72, 26, 64, 64), "end of first row");
+    Eq(b[8], new Rectangle(8, 26 + 72, 64, 64), "second row starts under the first");
+    Eq(whole, new Size(8 + 8 * 72, 26 + 2 * 72), "window size");
+    Check(b.All(r => new Rectangle(Point.Empty, whole).Contains(r)), "all buttons inside");
+    Check(!b.Where((r, i) => b.Where((q, j) => j != i).Any(q => q.IntersectsWith(r))).Any(), "no overlaps");
+});
+
+Test("deck: assigning buttons", () =>
+{
+    var s = new Step("w.deck");
+    var notepad = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "notepad.exe");
+    Deck.Assign(s, 3, "\"" + notepad + "\"");
+    Eq(Deck.Target(s, 3), notepad, "quotes trimmed");
+    Eq(Deck.Label(s, 3), "Notepad", "name from the program");
+    Deck.Assign(s, 0, @"C:\Users\Me\Desktop\World of Warcraft.lnk");
+    Eq(Deck.Label(s, 0), "World of Warcraft", "shortcut name");
+    Eq(Deck.NameFor("https://www.youtube.com/watch?v=1"), "youtube.com", "website name");
+    Eq(Deck.NameFor(@"D:\"), "D: drive", "drive");
+    Eq(Deck.NameFor(@"C:\tools\myapp.exe"), "Myapp", "missing exe → file name");
+    var shape = Deck.Shape(s);
+    Deck.Assign(s, 5, notepad);
+    Eq(Deck.Shape(s), shape, "buttons don't change the window's shape");
+    s.P["cols"] = "4";
+    Check(Deck.Shape(s) != shape, "columns do");
+    Deck.Clear(s, 3);
+    Eq(Deck.Target(s, 3), "", "cleared");
+    Check(!s.P.ContainsKey("b3.name"), "label cleared too");
+    Deck.Assign(s, 5, "  ");
+    Eq(Deck.Target(s, 5), "", "blank clears");
+    var v = new Vibe { Kind = "widget", Widget = s };
+    Eq(Share.Decode(Share.Encode(v))!.Widget!.Get("b0"), @"C:\Users\Me\Desktop\World of Warcraft.lnk", "buttons survive a share code");
+    Check(Json.Clone(v).Widget!.Get("b0.name") == "World of Warcraft", "and saving");
+});
+
+Test("deck: launching something that's gone", () =>
+{
+    var msg = Deck.Launch(@"C:\definitely\not\here\game.exe");
+    Check(msg != null && msg.Contains("isn't there"), "plain message, nothing started");
+    Eq(Deck.Launch(""), null, "empty button does nothing");
+});
+
+Test("deck: icons", () =>
+{
+    var notepad = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), "notepad.exe");
+    var icon = Deck.Icon(notepad, 48);
+    Check(icon != null && icon.Width >= 32, "real icon from the shell");
+    Check(ReferenceEquals(icon, Deck.Icon(notepad, 48)), "cached");
+    Check(Deck.Icon(@"C:\nope\missing.exe", 48) == null, "missing file → no icon");
+});
+
 // ---------- AI describe (canned answers, no network) ----------
 
 string ApiResponse(string answer, string stop = "end_turn") =>

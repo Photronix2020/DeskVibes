@@ -112,6 +112,7 @@ public static class Gallery
         new("Widgets", "Unread count and newest emails.", () => Widget("Inbox", S("w.mail"), 320)),
         new("Widgets", "Today's meetings from classic Outlook.", () => Widget("Today", S("w.meetings"), 300)),
         new("Widgets", "Headlines from any news feed.", () => Widget("Headlines", S("w.news"), 340)),
+        new("Widgets", "A Stream Deck on your screen: point at it for a grid of buttons that open your programs.", () => Widget("Buttons", S("w.deck"))),
         new("Widgets", "Any text, like a motto.", () => Widget("Motto", S("w.text", ("text", "Ship it."), ("size", "22")), 220, "desktop")),
     };
 
