@@ -39,14 +39,22 @@ screen (games and movies), or battery / plugged in. You can set quiet hours too.
 
 Widgets
 -------
-Clock (with a second time zone), weather, stocks & crypto, PC health, countdown, focus timer, sticky note, status
-board (websites and WoW realms), clipboard history, screen time, inbox, today's meetings, headlines, text.
+Clock (with a second time zone), weather, stocks & crypto, PC health (CPU, memory, graphics card, disks, network
+speed, ping, busiest apps, battery), countdown, timers and alarms, focus timer, sticky note, status board (websites
+and WoW realms), clipboard history, screen time, inbox, today's meetings, headlines, text.
 Right-click a widget: keep on top, stay on the desktop behind your windows, lock in place, let clicks go through it,
 or make it see-through.
 
 Button deck: a Stream Deck on your screen. It sits as a small tab; point at it and a grid of buttons opens
 (8 across and 2 down to start, change it with "Change size and layout"). Click an empty button, right-click any
 button, or drag a program onto it to choose what it opens. Each button shows that program's own icon.
+
+Timers and alarms
+-----------------
+Type it in the box ("set a 10 minute timer for the pizza", "wake me up at 7 on weekdays", "remind me in 20 minutes
+to check the oven"), press "Timer or alarm", or right-click the tray icon > Timers and alarms for one-click timers.
+When one goes off it rings, lights the screen edges and shows Stop / Snooze. Timers and alarms ring even during quiet
+hours, and they're kept if you restart.
 
 Share
 -----

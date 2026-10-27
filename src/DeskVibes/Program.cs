@@ -41,13 +41,17 @@ static class Program
             {
                 f.StartPosition = FormStartPosition.Manual; f.Location = new Point(-30000, -30000);
                 if (!f.Visible) f.Show();
-                f.Refresh(); Application.DoEvents();
+                // let child controls paint too (buttons, text boxes) before taking the picture
+                for (int i = 0; i < 6; i++) { f.Refresh(); Application.DoEvents(); Thread.Sleep(30); }
                 using var bmp = new Bitmap(f.Width, f.Height);
-                using (var g = Graphics.FromImage(bmp))
+                // twice: the first picture of a freshly shown window can miss controls that haven't painted yet
+                for (int pass = 0; pass < 2; pass++)
                 {
+                    using var g = Graphics.FromImage(bmp);
                     var hdc = g.GetHdc();
                     PrintWindow(f.Handle, hdc, 2 /* PW_RENDERFULLCONTENT */);
                     g.ReleaseHdc(hdc);
+                    if (pass == 0) { Application.DoEvents(); Thread.Sleep(60); }
                 }
                 bmp.Save(Path.Combine(render, file), System.Drawing.Imaging.ImageFormat.Png);
             }
@@ -76,6 +80,23 @@ static class Program
                 """)!;
             Snap(new BuilderForm(ai.Vibe, quiet.Engine, true, string.Join("\n", ai.Understood)), "ui-builder-ai.png");
             Snap(new BuilderForm(Gallery.Ideas.First(i => i.Make().IsWidget).Make(), quiet.Engine, true), "ui-builder-widget.png");
+            // timers: the window in both modes, the ringing pop-ups, and a few running ones for the widget
+            var nowR = DateTime.Now;
+            foreach (var (f, file) in new (Form, string)[]
+            {
+                (new TimerDialog("timer", false), "ui-timer.png"), (new TimerDialog("alarm", false), "ui-alarm.png"),
+                (new RingForm(Timers.Timer(TimeSpan.FromMinutes(10), "Pizza", nowR)), "ui-ring-timer.png"),
+                (new RingForm(Timers.Alarm(new TimeSpan(7, 30, 0), "Weekdays", "Wake up", nowR)), "ui-ring-alarm.png"),
+            })
+            { Snap(f, file); f.Close(); }
+            Timers.Items = new List<TimerItem>
+            {
+                Timers.Timer(TimeSpan.FromMinutes(10), "Pizza", nowR.AddMinutes(-6)),
+                Timers.Timer(TimeSpan.FromSeconds(45), "", nowR),
+                Timers.Alarm(new TimeSpan(7, 30, 0), "Weekdays", "Wake up", nowR),
+                Timers.Alarm(new TimeSpan(18, 0, 0), "Once", "Call mom", nowR),
+            };
+            Timers.SetOn(Timers.Items[3], false, nowR);
             var shown = new List<(Form f, string n)>();
             foreach (var idea in Gallery.Ideas.Where(i => i.Category == "Widgets"))
             {

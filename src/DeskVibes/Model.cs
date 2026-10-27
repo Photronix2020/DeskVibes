@@ -103,6 +103,8 @@ public sealed class Settings
     public bool SeenWelcome { get; set; }
     /// <summary>The button deck was added (new installs get it in the starter set, older ones once on update).</summary>
     public bool GotDeck { get; set; }
+    /// <summary>Running timers and alarms (see <see cref="Timers"/>).</summary>
+    public List<TimerItem> Timers { get; set; } = new();
 }
 
 /// <summary>Values an event hands to its actions, used to fill {placeholders} in texts.</summary>

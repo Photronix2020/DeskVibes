@@ -102,7 +102,7 @@ public static class Gallery
         new("Widgets", "A clock with a second time zone.", () => Widget("Clock", S("w.clock", ("zone", "London"), ("date", "true")), 240)),
         new("Widgets", "Weather where you are (set your town in Settings).", () => Widget("Weather", S("w.weather"), 270)),
         new("Widgets", "Live stock and crypto prices.", () => Widget("Markets", S("w.tickers", ("symbols", "AAPL, MSFT, NVDA, ^GSPC, BTC-USD")), 290)),
-        new("Widgets", "CPU, memory, battery, disk and uptime.", () => Widget("PC health", S("w.system"), 250)),
+        new("Widgets", "CPU, memory, graphics card, disks, network speed, ping and the busiest apps.", () => Widget("PC health", S("w.system"), 300)),
         new("Widgets", "Count down to the weekend (or anything).", () => Widget("Weekend in", S("w.countdown", ("title", "The weekend"), ("target", "Friday 17:00")), 250)),
         new("Widgets", "A 25/5 focus timer. Click it to start.", () => Widget("Focus", S("w.focus"), 220)),
         new("Widgets", "A sticky note on your desktop.", () => Widget("Note", S("w.note", ("color", "#FFD60A")), 240, "desktop")),
@@ -112,6 +112,7 @@ public static class Gallery
         new("Widgets", "Unread count and newest emails.", () => Widget("Inbox", S("w.mail"), 320)),
         new("Widgets", "Today's meetings from classic Outlook.", () => Widget("Today", S("w.meetings"), 300)),
         new("Widgets", "Headlines from any news feed.", () => Widget("Headlines", S("w.news"), 340)),
+        new("Widgets", "Your timers and alarms at a glance, with one-click timers.", () => Widget("Timers", S("w.timers"), 270)),
         new("Widgets", "A Stream Deck on your screen: point at it for a grid of buttons that open your programs.", () => Widget("Buttons", S("w.deck"))),
         new("Widgets", "Any text, like a motto.", () => Widget("Motto", S("w.text", ("text", "Ship it."), ("size", "22")), 220, "desktop")),
     };

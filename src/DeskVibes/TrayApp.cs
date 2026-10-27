@@ -34,6 +34,10 @@ public sealed class TrayApp : ApplicationContext
         if (Store.FirstRun) { foreach (var v in Gallery.Starter()) Store.Vibes.Add(v); Store.Settings.GotDeck = true; Store.Save(); }
         else if (Gallery.AddDeckOnce(Store.Vibes, Store.Settings)) Store.Save();
 
+        Timers.Items = Store.Settings.Timers;
+        Timers.Changed += () => { Store.Save(); foreach (var (f, _) in widgets.Values) f.Invalidate(); };
+        Timers.ShowDialog = mode => new TimerDialog(mode, Store.Settings.Clock24).Show();
+
         tray = new NotifyIcon { Icon = icon, Text = "DeskVibes", Visible = true, ContextMenuStrip = new ContextMenuStrip { Renderer = new DarkMenu(), ShowImageMargin = false } };
         tray.ContextMenuStrip.Opening += (_, _) => BuildMenu();
         tray.MouseClick += (_, e) => { if (e.Button == MouseButtons.Left) ShowMain(); };
@@ -54,7 +58,22 @@ public sealed class TrayApp : ApplicationContext
     {
         try { world.Refresh(); } catch (Exception ex) { Engine.Note("Couldn't read the PC state: " + ex.Message); }
         Engine.Tick();
+        CheckTimers();
         foreach (var (form, _) in widgets.Values) if (form.Visible && form is WidgetForm) form.Invalidate();
+    }
+
+    /// <summary>Rings what's due. Timers and alarms ring even when paused or in quiet hours: you set them on purpose.</summary>
+    void CheckTimers()
+    {
+        var missed = new List<TimerItem>();
+        var due = Timers.TakeDue(Timers.Items, DateTime.Now, missed);
+        foreach (var t in due) { Engine.Note($"Ringing: {Timers.Name(t)}"); RingForm.Ring(t); }
+        foreach (var t in missed)
+        {
+            Engine.Note($"Missed while the PC was asleep or DeskVibes was closed: {Timers.Name(t)}");
+            Cards.Show("Missed " + (t.IsAlarm ? "alarm" : "timer"), $"{Timers.Name(t)} was due at {t.Due:t}", Color.FromArgb(255, 149, 0), 0, "Bottom right", "");
+        }
+        if (due.Count + missed.Count > 0) Timers.Touch();
     }
 
     /// <summary>Brings widgets and hotkeys in line with the saved vibes.</summary>
@@ -168,6 +187,17 @@ public sealed class TrayApp : ApplicationContext
         m.Items.Add("Ideas…", null, (_, _) => ShowMain("ideas"));
         m.Items.Add(new ToolStripSeparator());
         if (Overlays.EdgesShowing) m.Items.Add("Clear the alerts", null, (_, _) => Overlays.CloseAll());
+        var timers = new ToolStripMenuItem("Timers and alarms");
+        var now = DateTime.Now;
+        foreach (var t in Timers.Sorted(Timers.Items))
+        {
+            var it = new ToolStripMenuItem(TimerMenus.Line(t, now));
+            TimerMenus.AddFor(it.DropDownItems, t);
+            timers.DropDownItems.Add(it);
+        }
+        if (Timers.Items.Count > 0) timers.DropDownItems.Add(new ToolStripSeparator());
+        TimerMenus.AddNew(timers.DropDownItems);
+        m.Items.Add(timers);
         var pause = new ToolStripMenuItem("Pause everything") { Checked = Store.Settings.Paused };
         pause.Click += (_, _) => { Store.Settings.Paused = !Store.Settings.Paused; SaveSettings(); Engine.Note(Store.Settings.Paused ? "Paused" : "Running again"); };
         m.Items.Add(pause);

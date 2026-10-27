@@ -93,6 +93,9 @@ public sealed class MainForm : Form
         async void Go()
         {
             if (ask.Text.Trim().Length == 0 || !make.Enabled) return;
+            // "set a 10 minute timer for the pizza", "wake me up at 7": start it right away
+            var quick = Timers.Quick(ask.Text, DateTime.Now);
+            if (quick != null) { Timers.Add(quick); TimerMenus.Confirm(quick); ask.Clear(); return; }
             var key = Secret.Unprotect(app.Store.Settings.AnthropicKeyProtected);
             Describe.Result r;
             if (key.Length == 0) r = Describe.Parse(ask.Text);
@@ -119,6 +122,8 @@ public sealed class MainForm : Form
             "when Stormrage realm comes back up say it out loud",
             "when it's going to rain in Boston pop up a card",
             "ctrl+alt+b hides everything",
+            "set a 10 minute timer for the pizza",
+            "wake me up at 7 on weekdays",
         })
         {
             var l = new LinkLabel { Text = ex, AutoSize = true, LinkColor = Theme.AccentHot, ActiveLinkColor = Theme.Text, Font = Theme.Small, Margin = new Padding(3, 4, 8, 0) };
@@ -130,8 +135,9 @@ public sealed class MainForm : Form
         var buttons = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0, 4, 0, 8) };
         var nr = Theme.Button("+ New vibe"); nr.Click += (_, _) => app.Edit(new Vibe { Name = "", When = new Step("mail.new"), Do = { new Step("show.edges") } }, true, this);
         var nw = Theme.Button("+ New widget"); nw.Click += (_, _) => app.Edit(new Vibe { Kind = "widget", Name = "Clock", Widget = new Step("w.clock") }, true, this);
+        var tm = Theme.Button("⏱ Timer or alarm"); tm.Click += (_, _) => Timers.ShowDialog?.Invoke("timer");
         var paste = Theme.Button("Paste a share code"); paste.Click += (_, _) => PasteCode();
-        buttons.Controls.Add(nr); buttons.Controls.Add(nw); buttons.Controls.Add(paste);
+        buttons.Controls.Add(nr); buttons.Controls.Add(nw); buttons.Controls.Add(tm); buttons.Controls.Add(paste);
         p.Controls.Add(buttons);
 
         list = new FlowLayoutPanel { FlowDirection = FlowDirection.TopDown, WrapContents = false, AutoSize = true, Margin = new Padding(0) };

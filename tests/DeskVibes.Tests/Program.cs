@@ -329,6 +329,180 @@ Test("deck: added once to older setups", () =>
     Eq(has.Count, 1, "no second deck if one is there");
 });
 
+// ---------- timers & alarms ----------
+
+var mon2pm = new DateTime(2026, 10, 26, 14, 0, 0); // a Monday
+
+Test("timers: make, count down, ring", () =>
+{
+    var t = Timers.Timer(TimeSpan.FromMinutes(10), " Pizza ", mon2pm);
+    Eq(t.Label, "Pizza", "label trimmed");
+    Eq(t.Due, mon2pm.AddMinutes(10), "due");
+    Eq(Timers.Left(t, mon2pm), "10:00", "full");
+    Eq(Timers.Left(t, mon2pm.AddSeconds(1.2)), "9:59", "counts down, rounding up");
+    Eq(Timers.Left(Timers.Timer(TimeSpan.FromMinutes(90), "", mon2pm), mon2pm), "1:30:00", "hours");
+    Eq(Timers.Length(5400), "1 hour 30 minutes", "length words");
+    Eq(Timers.Length(60), "1 minute", "singular");
+    Eq(Timers.Name(Timers.Timer(TimeSpan.FromMinutes(5), "", mon2pm)), "5 minutes timer", "name without label");
+    var list = new List<TimerItem> { t };
+    Eq(Timers.TakeDue(list, mon2pm.AddMinutes(9)).Count, 0, "not yet");
+    var rang = Timers.TakeDue(list, mon2pm.AddMinutes(10));
+    Eq(rang.Count, 1, "rings on time");
+    Eq(list.Count, 0, "timer goes away after ringing");
+    var snooze = Timers.Snooze(t, 5, mon2pm.AddMinutes(10));
+    Eq(snooze.Due, mon2pm.AddMinutes(15), "snooze 5");
+    Eq(snooze.Label, "Pizza", "snooze keeps the name");
+    Check(Timers.Timer(TimeSpan.Zero, "", mon2pm).Seconds >= 1, "at least a second");
+});
+
+Test("timers: alarms", () =>
+{
+    var a = Timers.Alarm(new TimeSpan(7, 30, 0), "Weekdays", "Wake up", mon2pm);
+    Eq(a.Time, "07:30", "time");
+    Eq(a.Due, new DateTime(2026, 10, 27, 7, 30, 0), "next weekday morning");
+    Check(Timers.Left(a, mon2pm).StartsWith("Tomorrow"), "says tomorrow");
+    var fri = new DateTime(2026, 10, 30, 9, 0, 0);
+    Eq(Timers.NextAlarm(new TimeSpan(7, 30, 0), "Weekdays", fri), new DateTime(2026, 11, 2, 7, 30, 0), "weekdays skip the weekend");
+    Eq(Timers.NextAlarm(new TimeSpan(10, 0, 0), "Weekends", mon2pm), new DateTime(2026, 10, 31, 10, 0, 0), "weekends wait for Saturday");
+    Eq(Timers.NextAlarm(new TimeSpan(15, 0, 0), "Once", mon2pm), mon2pm.AddHours(1), "later today");
+    Eq(Timers.NextAlarm(new TimeSpan(14, 0, 0), "Once", mon2pm), mon2pm.AddDays(1), "exactly now → tomorrow");
+
+    var list = new List<TimerItem> { a, Timers.Alarm(new TimeSpan(7, 25, 0), "Once", "", mon2pm) };
+    var rang = Timers.TakeDue(list, new DateTime(2026, 10, 27, 7, 30, 5));
+    Eq(rang.Count, 2, "both ring (the one-time one 5 minutes late)");
+    Eq(list.Count, 2, "alarms stay in the list");
+    Eq(a.Due, new DateTime(2026, 10, 28, 7, 30, 0), "repeating alarm moves to the next day");
+    Check(!list[1].On, "one-time alarm switches itself off");
+    Eq(Timers.Left(list[1], mon2pm), "off", "shows off");
+    Timers.SetOn(list[1], true, mon2pm);
+    Check(list[1].On && list[1].Due == new DateTime(2026, 10, 27, 7, 25, 0), "switching on picks the next time");
+
+    var missed = new List<TimerItem>();
+    var late = new List<TimerItem> { Timers.Timer(TimeSpan.FromMinutes(1), "Tea", mon2pm) };
+    Eq(Timers.TakeDue(late, mon2pm.AddHours(2), missed).Count, 0, "very late: doesn't ring");
+    Eq(missed.Count, 1, "reported as missed");
+    Eq(late.Count, 0, "and cleared");
+
+    var sorted = Timers.Sorted(new[] { a, Timers.Timer(TimeSpan.FromMinutes(3), "b", mon2pm), Timers.Timer(TimeSpan.FromMinutes(1), "c", mon2pm) }).Select(x => x.Label).ToList();
+    Eq(string.Join(",", sorted), "c,b,Wake up", "timers first, soonest first");
+});
+
+Test("timers: understood from a sentence", () =>
+{
+    TimerItem Q(string s) => Timers.Quick(s, mon2pm)!;
+    var t = Q("set a 10 minute timer for the pizza");
+    Check(!t.IsAlarm, "timer");
+    Eq(t.Seconds, 600, "10 minutes");
+    Eq(t.Label, "Pizza", "label");
+    t = Q("timer 25 minutes"); Eq(t.Seconds, 1500, "timer N minutes"); Eq(t.Label, "", "no label");
+    t = Q("timer 10 min pizza"); Eq(t.Label, "Pizza", "label after the time");
+    t = Q("remind me in 20 minutes to check the oven"); Eq(t.Seconds, 1200, "remind in"); Eq(t.Label, "Check the oven", "remind label");
+    t = Q("remind me to stretch in 45 minutes"); Eq(t.Seconds, 2700, "remind ... in"); Eq(t.Label, "Stretch", "label before the time");
+    t = Q("start a timer for 1 hour 30 minutes called laundry"); Eq(t.Seconds, 5400, "hours and minutes"); Eq(t.Label, "Laundry", "called");
+    t = Q("timer for half an hour"); Eq(t.Seconds, 1800, "half an hour");
+    t = Q("90 second timer"); Eq(t.Seconds, 90, "seconds");
+    t = Q("set an alarm in 20 minutes"); Check(!t.IsAlarm && t.Seconds == 1200, "alarm in N minutes is a timer");
+
+    var a = Q("wake me up at 7 on weekdays");
+    Check(a.IsAlarm, "alarm");
+    Eq(a.Time, "07:00", "wake → morning");
+    Eq(a.Days, "Weekdays", "weekdays");
+    Eq(a.Label, "", "no label");
+    a = Q("alarm 6:45pm call mom"); Eq(a.Time, "18:45", "pm"); Eq(a.Label, "Call mom", "label after time"); Eq(a.Days, "Once", "once");
+    a = Q("set an alarm for 7:30 am every day"); Eq(a.Time, "07:30", "for 7:30 am"); Eq(a.Days, "Every day", "every day");
+    a = Q("remind me at 3pm to call the dentist"); Check(a.IsAlarm, "remind at → alarm"); Eq(a.Time, "15:00", "3pm"); Eq(a.Label, "Call the dentist", "to ...");
+    a = Q("alarm at 5"); Eq(a.Time, "17:00", "at 5 in the afternoon → 5 PM (the next one)");
+    a = Q("alarm at noon for lunch"); Eq(a.Time, "12:00", "noon"); Eq(a.Label, "Lunch", "for lunch");
+    a = Q("alarm at 10 tonight"); Eq(a.Time, "22:00", "tonight");
+
+    foreach (var normal in new[] { "remind me to stretch after 45 minutes of work", "at 5pm on weekdays show a banner saying go home",
+             "every 30 minutes", "when I get an email from my boss turn the edges of the screen red", "if AAPL moves 5% tell me", "ctrl+alt+b hides everything" })
+        Check(Timers.Quick(normal, mon2pm) == null, "normal vibe stays a vibe: " + normal);
+    Check(Timers.Quick("set an alarm", mon2pm) == null, "alarm without a time");
+    Check(Timers.ParseLength("2h 5m 3s") == TimeSpan.FromSeconds(7503), "2h 5m 3s");
+});
+
+Test("timers: saved with the settings", () =>
+{
+    var s = new Settings();
+    s.Timers.Add(Timers.Alarm(new TimeSpan(6, 0, 0), "Weekends", "Run", mon2pm));
+    s.Timers.Add(Timers.Timer(TimeSpan.FromMinutes(3), "Tea", mon2pm));
+    var back = Json.Read<Settings>(Json.Write(s))!;
+    Eq(back.Timers.Count, 2, "both");
+    Check(back.Timers[0].IsAlarm && back.Timers[0].Days == "Weekends" && back.Timers[0].Label == "Run", "alarm kept");
+    Eq(back.Timers[1].Due, mon2pm.AddMinutes(3), "timer due kept");
+    Check(Catalog.Find("w.timers") != null && Gallery.Ideas.Any(i => i.Make().Widget?.Type == "w.timers"), "timers widget in the catalog and Ideas");
+});
+
+// ---------- PC health ----------
+
+Test("health: sums", () =>
+{
+    var engines = new[]
+    {
+        ("pid_10_luid_0x00000000_0x0000D1A4_phys_0_eng_0_engtype_3D", 30.0),
+        ("pid_22_luid_0x00000000_0x0000D1A4_phys_0_eng_0_engtype_3D", 25.0),
+        ("pid_22_luid_0x00000000_0x0000D1A4_phys_0_eng_3_engtype_VideoDecode", 40.0),
+        ("pid_31_luid_0x00000000_0x0000AAAA_phys_0_eng_0_engtype_3D", 10.0),
+    };
+    Eq(Health.GpuPercent(engines), 55.0, "busiest engine, all apps added up");
+    Eq(Health.GpuPercent(new[] { ("pid_1_luid_0x0_0x1_phys_0_eng_0_engtype_3D", 80.0), ("pid_2_luid_0x0_0x1_phys_0_eng_0_engtype_3D", 70.0) }), 100.0, "capped at 100");
+    Eq(Health.GpuPercent(Array.Empty<(string, double)>()), 0.0, "nothing");
+    Eq(Health.Mbps(2_000_000, 1_000_000, 2), 4.0, "bytes → Mbps");
+    Eq(Health.Mbps(5, 10, 1), 0.0, "counter reset");
+    Eq(Health.Speed(12.34), "12.3 Mbps", "speed");
+    Eq(Health.Speed(0.85), "850 kbps", "slow speed");
+});
+
+Test("health: widget lines", () =>
+{
+    var h = new HealthStats
+    {
+        Taken = mon2pm, Cpu = 42, CpuGhz = 4.1, MemUsedGb = 12.5, MemTotalGb = 32, MemPercent = 39, Gpu = 64, GpuMemUsedGb = 3.2, GpuMemTotalGb = 8,
+        DiskBusy = 12, DiskReadMBs = 1.5, DiskWriteMBs = 0.2, Drives = { new("C:", 120, 476), new("D:", 5, 931) },
+        DownMbps = 23.4, UpMbps = 1.2, PingMs = 18, Processes = 230, TopCpuApp = "chrome", TopCpuPercent = 12, TopMemApp = "chrome", TopMemGb = 2.1,
+        Uptime = TimeSpan.FromHours(30), Battery = 80, Charging = false, BatteryLeft = TimeSpan.FromMinutes(150),
+    };
+    var lines = WidgetContent.HealthLines(h, new Step("w.system"));
+    string R(string left) => lines.FirstOrDefault(l => l.Text == left)?.Right ?? "(missing)";
+    Eq(R("CPU"), "42% · 4.1 GHz", "cpu");
+    Eq(R("Memory"), "12.5 of 32 GB", "memory");
+    Eq(R("Graphics"), "64% · 3.2 of 8 GB", "gpu");
+    Check(R("Disks").StartsWith("12%"), "disk activity");
+    Eq(R("Drive C:"), "120 GB free of 476", "drive C");
+    Check(lines.First(l => l.Text == "Drive D:").RightColor == Theme.Bad, "nearly full drive is red");
+    Eq(R("Network"), "↓ 23.4 Mbps  ↑ 1.2 Mbps", "network");
+    Eq(R("Ping"), "18 ms", "ping");
+    Eq(R("Battery"), "80% · 2h 30m left", "battery time left");
+    Eq(R("Busiest app"), "chrome 12%", "busiest");
+    Eq(R("Most memory"), "chrome 2.1 GB", "memory hog");
+    Eq(R("Up for"), "1d 6h · 230 processes", "uptime");
+    var off = new Step("w.system", ("gpu", "false"), ("disk", "false"), ("net", "false"), ("top", "false"));
+    var few = WidgetContent.HealthLines(h, off).Select(l => l.Text).ToList();
+    Check(!few.Contains("Graphics") && !few.Contains("Network") && !few.Contains("Drive C:") && !few.Contains("Busiest app"), "sections can be switched off");
+    Check(few.Contains("CPU") && few.Contains("Memory"), "basics stay");
+    h.Online = false;
+    Eq(WidgetContent.HealthLines(h, new Step("w.system")).First(l => l.Text == "Internet").Right, "offline", "offline");
+    Eq(WidgetContent.HealthLines(new HealthStats { Taken = DateTime.MinValue }, new Step("w.system"))[0].Text, "Measuring…", "before the first reading");
+});
+
+Test("health: real reading of this PC (no internet)", () =>
+{
+    using var s = new Health.Sampler();
+    s.Sample(ping: false);
+    Thread.Sleep(1100);
+    var h = s.Sample(ping: false);
+    Check(h.Cpu is >= 0 and <= 100, "cpu in range");
+    Check(h.MemTotalGb > 1 && h.MemUsedGb > 0, "memory");
+    Check(h.Drives.Any(d => d.Name.StartsWith("C")), "drive C listed");
+    Check(h.Processes > 10, "processes counted");
+    Check(h.TopMemApp.Length > 0, "an app uses the most memory");
+    Check(h.DiskBusy is null or (>= 0 and <= 100), "disk busy in range");
+    Check(h.Gpu is null or (>= 0 and <= 100), "gpu in range");
+    Check(h.PingMs == null, "didn't ping");
+    Console.WriteLine($"      this PC: cpu {h.Cpu:0}% {h.CpuGhz:0.0}GHz '{h.CpuName}', gpu {(h.Gpu?.ToString("0") ?? "n/a")}% '{h.GpuName}' {h.GpuMemTotalGb:0}GB, disk {(h.DiskBusy?.ToString("0") ?? "n/a")}%, top {h.TopCpuApp}/{h.TopMemApp}");
+});
+
 // ---------- AI describe (canned answers, no network) ----------
 
 string ApiResponse(string answer, string stop = "end_turn") =>

@@ -99,17 +99,8 @@ public sealed class WidgetContent
                 break;
             }
             case "w.system":
-            {
-                L.Add(new WLine("CPU", Theme.Dim) { Right = $"{w.Cpu:0}%", Bar = w.Cpu / 100 });
-                L.Add(new WLine("Memory", Theme.Dim) { Right = $"{w.Memory:0}%", Bar = w.Memory / 100 });
-                if (w.Battery != null) L.Add(new WLine("Battery" + (w.Plugged == true ? " (charging)" : ""), Theme.Dim) { Right = $"{w.Battery}%", Bar = w.Battery / 100.0 });
-                var free = w.FreeGb("C");
-                if (free >= 0) L.Add(new WLine("Disk C free", Theme.Dim) { Right = $"{free:0} GB", RightColor = free < 10 ? Theme.Bad : null });
-                var up = TimeSpan.FromMilliseconds(Environment.TickCount64);
-                L.Add(new WLine("Up for", Theme.Dim) { Right = up.TotalDays >= 1 ? $"{(int)up.TotalDays}d {up.Hours}h" : $"{up.Hours}h {up.Minutes}m" });
-                L.Add(new WLine("Internet", Theme.Dim) { Right = w.Online ? "online" : "offline", RightColor = w.Online ? Theme.Good : Theme.Bad });
+                L.AddRange(HealthLines(Health.Get(), S));
                 break;
-            }
             case "w.countdown":
             {
                 var target = NextTime(S.Get("target"), now);
@@ -218,6 +209,9 @@ public sealed class WidgetContent
             case "w.text":
                 L.Add(new WLine(new Ctx().Fill(S.Get("text"), now), Theme.Text, (float)Math.Clamp(S.Num("size", 16) / 10.0, 0.7, 6)));
                 break;
+            case "w.timers":
+                TimerLines(L, now);
+                break;
             case "w.note":
             case "w.deck": // drawn by DeckForm
                 break;
@@ -226,6 +220,82 @@ public sealed class WidgetContent
                 break;
         }
         return L;
+    }
+
+    /// <summary>The PC health widget's lines for one reading. Each section can be switched off in the widget's settings.</summary>
+    public static List<WLine> HealthLines(HealthStats h, Step opt)
+    {
+        var L = new List<WLine>();
+        bool On(string key) => opt.Get(key, "true") != "false";
+        static Color? Hot(double pct) => pct > 90 ? Theme.Bad : pct > 75 ? Theme.Warn : null;
+        if (h.Taken == DateTime.MinValue) { L.Add(new WLine("Measuring…", Theme.Faint)); return L; }
+
+        L.Add(new WLine("CPU", Theme.Dim) { Right = $"{h.Cpu:0}%" + (h.CpuGhz > 0.1 ? $" · {h.CpuGhz:0.0} GHz" : ""), RightColor = Hot(h.Cpu), Bar = h.Cpu / 100 });
+        L.Add(new WLine("Memory", Theme.Dim) { Right = $"{Health.Gb(h.MemUsedGb)} of {h.MemTotalGb:0} GB", RightColor = Hot(h.MemPercent), Bar = h.MemPercent / 100 });
+        if (On("gpu") && h.Gpu != null)
+        {
+            var vram = h.GpuMemUsedGb is double used ? $" · {Health.Gb(used)}{(h.GpuMemTotalGb >= 1 ? $" of {h.GpuMemTotalGb:0}" : "")} GB" : "";
+            L.Add(new WLine("Graphics", Theme.Dim) { Right = $"{h.Gpu:0}%{vram}", RightColor = Hot(h.Gpu.Value), Bar = h.Gpu / 100 });
+        }
+        if (On("disk"))
+        {
+            if (h.DiskBusy != null)
+                L.Add(new WLine("Disks", Theme.Dim) { Right = $"{h.DiskBusy:0}% · read {h.DiskReadMBs:0.0} · write {h.DiskWriteMBs:0.0} MB/s", Bar = h.DiskBusy / 100 });
+            foreach (var d in h.Drives.Take(6))
+            {
+                double usedPct = d.TotalGb > 0 ? 1 - d.FreeGb / d.TotalGb : 0;
+                L.Add(new WLine("Drive " + d.Name, Theme.Dim)
+                {
+                    Right = $"{Health.Gb(d.FreeGb)} GB free of {d.TotalGb:0}",
+                    RightColor = d.FreeGb < 10 ? Theme.Bad : d.FreeGb < 30 ? Theme.Warn : null,
+                    Bar = usedPct, BarColor = d.FreeGb < 10 ? Theme.Bad : d.FreeGb < 30 ? Theme.Warn : Theme.Accent,
+                });
+            }
+        }
+        if (On("net"))
+        {
+            if (!h.Online) L.Add(new WLine("Internet", Theme.Dim) { Right = "offline", RightColor = Theme.Bad });
+            else
+            {
+                L.Add(new WLine("Network", Theme.Dim) { Right = $"↓ {Health.Speed(h.DownMbps)}  ↑ {Health.Speed(h.UpMbps)}" });
+                if (h.PingMs is int ms)
+                    L.Add(new WLine("Ping", Theme.Dim) { Right = $"{ms} ms", RightColor = ms < 60 ? Theme.Good : ms < 150 ? Theme.Warn : Theme.Bad });
+                else if (h.PingFailed) L.Add(new WLine("Ping", Theme.Dim) { Right = "no answer", RightColor = Theme.Warn });
+            }
+        }
+        if (h.Battery is int bat)
+        {
+            var left = h.BatteryLeft is TimeSpan t ? $" · {(int)t.TotalHours}h {t.Minutes}m left" : "";
+            L.Add(new WLine("Battery" + (h.Charging ? " (charging)" : ""), Theme.Dim) { Right = $"{bat}%{left}", RightColor = bat < 15 && !h.Charging ? Theme.Bad : null, Bar = bat / 100.0 });
+        }
+        if (On("top"))
+        {
+            if (h.TopCpuApp.Length > 0) L.Add(new WLine("Busiest app", Theme.Dim) { Right = $"{h.TopCpuApp} {h.TopCpuPercent:0}%" });
+            if (h.TopMemApp.Length > 0) L.Add(new WLine("Most memory", Theme.Dim) { Right = $"{h.TopMemApp} {Health.Gb(h.TopMemGb)} GB" });
+        }
+        var up = h.Uptime;
+        L.Add(new WLine("Up for", Theme.Dim) { Right = (up.TotalDays >= 1 ? $"{(int)up.TotalDays}d {up.Hours}h" : $"{up.Hours}h {up.Minutes}m") + (h.Processes > 0 ? $" · {h.Processes} processes" : "") });
+        return L;
+    }
+
+    static void TimerLines(List<WLine> L, DateTime now)
+    {
+        var items = Timers.Sorted(Timers.Items).ToList();
+        if (items.Count == 0) L.Add(new WLine("Nothing running", Theme.Faint));
+        foreach (var t in items.Take(8))
+        {
+            var left = (t.Due - now).TotalSeconds;
+            var line = new WLine((t.IsAlarm ? "⏰ " : "⏱ ") + Timers.Name(t), t.On ? Theme.Text : Theme.Faint)
+            {
+                Right = Timers.Left(t, now),
+                RightColor = !t.On ? Theme.Faint : !t.IsAlarm && left < 60 ? Theme.Warn : Theme.Text,
+                Click = () => TimerMenus.Popup(i => TimerMenus.AddFor(i, t)),
+            };
+            if (!t.IsAlarm && t.Seconds > 0) { line.Bar = Math.Clamp(1 - left / t.Seconds, 0, 1); line.BarColor = Theme.Accent; }
+            L.Add(line);
+        }
+        if (items.Count > 8) L.Add(new WLine($"and {items.Count - 8} more in the tray menu", Theme.Faint));
+        L.Add(new WLine("+ New timer or alarm", Theme.AccentHot) { Click = () => TimerMenus.Popup(TimerMenus.AddNew) });
     }
 
     void FocusLines(List<WLine> L, DateTime now)
